@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SOC Incident Report</title>
+<style>
+/* ── Reset & Base ───────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  font-size: 11pt;
+  color: #1a1a1a;
+  background: #f0f0f0;
+  line-height: 1.5;
+}
+
+/* ── Toolbar ────────────────────────────────────────────── */
+#toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: #1e3a5f;
+  color: #fff;
+  padding: 8px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 10pt;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+#toolbar h1 { font-size: 12pt; font-weight: 700; flex: 1; letter-spacing: .5px; }
+#toolbar button {
+  background: #2e6da4;
+  color: #fff;
+  border: 1px solid #5a9fd4;
+  border-radius: 4px;
+  padding: 5px 14px;
+  cursor: pointer;
+  font-size: 10pt;
+  transition: background .2s;
+}
+#toolbar button:hover { background: #3a85c7; }
+#toolbar button.active { background: #e65c00; border-color: #ff8533; }
+#toolbar .hint { color: #aac8e8; font-size: 9pt; margin-left: 8px; }
+
+/* ── Page / Report wrapper ──────────────────────────────── */
+#report-wrapper {
+  max-width: 210mm;
+  margin: 20px auto;
+  background: #fff;
+  box-shadow: 0 2px 12px rgba(0,0,0,.18);
+  padding: 20mm 18mm 24mm;
+}
+
+/* ── Cover / header ─────────────────────────────────────── */
+.report-header {
+  border-bottom: 3px solid #1e3a5f;
+  padding-bottom: 12px;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+.report-header .org { font-size: 9pt; color: #666; }
+.report-header .report-title { font-size: 18pt; font-weight: 700; color: #1e3a5f; }
+.report-header .report-id  { font-size: 9pt; color: #555; text-align: right; }
+
+/* ── Sections ───────────────────────────────────────────── */
+.section {
+  margin-bottom: 22px;
+  page-break-inside: avoid;
+}
+.section-title {
+  background: #1e3a5f;
+  color: #fff;
+  font-size: 11pt;
+  font-weight: 700;
+  padding: 5px 10px;
+  margin-bottom: 10px;
+  letter-spacing: .3px;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+.section-subtitle {
+  font-size: 10pt;
+  font-weight: 700;
+  color: #1e3a5f;
+  border-bottom: 1px solid #b0c4de;
+  margin: 10px 0 6px;
+  padding-bottom: 2px;
+}
+
+/* ── Field grid ─────────────────────────────────────────── */
+.field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 18px;
+  margin-bottom: 8px;
+}
+.field-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+.field-grid.cols-1 { grid-template-columns: 1fr; }
+.field {
+  display: flex;
+  flex-direction: column;
+}
+.field label {
+  font-size: 8.5pt;
+  font-weight: 700;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  margin-bottom: 2px;
+}
+.field .val {
+  border-bottom: 1px solid #ccc;
+  min-height: 22px;
+  font-size: 10pt;
+  padding: 2px 4px;
+  color: #1a1a1a;
+  outline: none;
+}
+.field .val[contenteditable="true"]:focus {
+  border-bottom-color: #2e6da4;
+  background: #f5faff;
+}
+
+/* ── Severity badge ─────────────────────────────────────── */
+.severity {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 3px;
+  font-weight: 700;
+  font-size: 9pt;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.sev-critical { background:#c0392b; color:#fff; }
+.sev-high     { background:#e67e22; color:#fff; }
+.sev-medium   { background:#f1c40f; color:#1a1a1a; }
+.sev-low      { background:#27ae60; color:#fff; }
+
+/* ── Tables ─────────────────────────────────────────────── */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9.5pt;
+  margin-top: 6px;
+}
+thead th {
+  background: #2e6da4;
+  color: #fff;
+  text-align: left;
+  padding: 5px 8px;
+  font-size: 9pt;
+  font-weight: 700;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+tbody td {
+  border: 1px solid #d0d8e4;
+  padding: 4px 8px;
+  vertical-align: top;
+}
+tbody tr:nth-child(even) td { background: #f5f8fc; }
+tbody td[contenteditable="true"]:focus { background: #eef4ff; outline: 1px solid #2e6da4; }
+tfoot td {
+  border: 1px solid #d0d8e4;
+  padding: 4px 8px;
+  font-style: italic;
+  color: #777;
+  font-size: 8.5pt;
+}
+
+/* ── Checklists ─────────────────────────────────────────── */
+.checklist { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 9.5pt; }
+.checklist thead th {
+  background: #2e6da4; color: #fff; padding: 5px 8px; text-align: left;
+  print-color-adjust: exact; -webkit-print-color-adjust: exact;
+}
+.checklist tbody td { border: 1px solid #d0d8e4; padding: 5px 8px; vertical-align: middle; }
+.checklist tbody tr:nth-child(even) td { background: #f5f8fc; }
+.checklist input[type=checkbox] { width: 14px; height: 14px; cursor: pointer; }
+.checklist td.action-col { width: 55%; }
+.checklist td.owner-col  { width: 20%; }
+.checklist td.ts-col     { width: 20%; }
+.checklist td.chk-col    { width: 5%;  text-align: center; }
+
+/* ── Narrative text areas ───────────────────────────────── */
+.narrative {
+  width: 100%;
+  min-height: 60px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  padding: 6px 8px;
+  font-size: 10pt;
+  font-family: inherit;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+  color: #1a1a1a;
+}
+.narrative:focus { border-color: #2e6da4; background: #f5faff; }
+
+/* ── Signature block ────────────────────────────────────── */
+.sig-block {
+  display: flex;
+  gap: 30px;
+  margin-top: 12px;
+}
+.sig-field { flex: 1; }
+.sig-line { border-top: 1px solid #333; margin-top: 28px; padding-top: 3px; font-size: 8.5pt; color: #555; }
+
+/* ── Preview mode ───────────────────────────────────────── */
+body.preview-mode [contenteditable="true"] {
+  border-bottom: 1px solid transparent;
+  background: transparent !important;
+  outline: none !important;
+}
+body.preview-mode table [contenteditable="true"] {
+  outline: none !important;
+}
+body.preview-mode .narrative {
+  border: 1px solid transparent;
+  background: transparent;
+  resize: none;
+}
+body.preview-mode #toolbar .hint { display: none; }
+body.preview-mode input[type=checkbox] { pointer-events: none; }
+
+/* ── Print ──────────────────────────────────────────────── */
+@page { size: A4; margin: 18mm 15mm 20mm; }
+@media print {
+  body  { background: #fff; }
+  #toolbar { display: none !important; }
+  #report-wrapper { box-shadow: none; margin: 0; padding: 0; max-width: 100%; }
+  .section { page-break-inside: avoid; }
+  .section-title, thead th, .checklist thead th {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════ TOOLBAR -->
+<div id="toolbar">
+  <h1>&#x1F6E1; SOC Incident Report</h1>
+  <button id="btn-edit" onclick="setMode('edit')">&#9998; Edit Mode</button>
+  <button id="btn-preview" onclick="setMode('preview')">&#128065; Preview Mode</button>
+  <button onclick="window.print()">&#128438; Print / Save PDF</button>
+  <span class="hint">Click any [placeholder] to edit &nbsp;|&nbsp; Print &rarr; Save as PDF for the final deliverable</span>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ REPORT -->
+<div id="report-wrapper">
+
+  <!-- Cover -->
+  <div class="report-header">
+    <div>
+      <div class="org" contenteditable="true">[Organisation Name]</div>
+      <div class="report-title">Incident Response Report</div>
+    </div>
+    <div class="report-id">
+      <div><strong>Report ID:</strong> <span contenteditable="true">[INC-YYYY-NNNN]</span></div>
+      <div><strong>Date Issued:</strong> <span contenteditable="true">[YYYY-MM-DD]</span></div>
+      <div><strong>Classification:</strong> <span contenteditable="true">[TLP:AMBER]</span></div>
+    </div>
+  </div>
+
+  <!-- ── SECTION 1: General Information ──────────────────────── -->
+  <div class="section">
+    <div class="section-title">1. General Information</div>
+
+    <div class="field-grid">
+      <div class="field"><label>Incident ID</label><div class="val" contenteditable="true">[INC-YYYY-NNNN]</div></div>
+      <div class="field"><label>Incident Title</label><div class="val" contenteditable="true">[Short descriptive title]</div></div>
+      <div class="field"><label>Date / Time Detected (UTC)</label><div class="val" contenteditable="true">[YYYY-MM-DD HH:MM]</div></div>
+      <div class="field"><label>Date / Time Reported (UTC)</label><div class="val" contenteditable="true">[YYYY-MM-DD HH:MM]</div></div>
+      <div class="field"><label>Date / Time Contained (UTC)</label><div class="val" contenteditable="true">[YYYY-MM-DD HH:MM]</div></div>
+      <div class="field"><label>Date / Time Resolved (UTC)</label><div class="val" contenteditable="true">[YYYY-MM-DD HH:MM]</div></div>
+    </div>
+
+    <div class="field-grid cols-3">
+      <div class="field">
+        <label>Severity</label>
+        <div class="val" contenteditable="true">
+          <span class="severity sev-high">[CRITICAL / HIGH / MEDIUM / LOW]</span>
+        </div>
+      </div>
+      <div class="field"><label>MITRE ATT&amp;CK Tactic(s)</label><div class="val" contenteditable="true">[e.g. Initial Access, Execution]</div></div>
+      <div class="field"><label>Incident Category</label><div class="val" contenteditable="true">[Ransomware / Phishing / BEC / Data Breach / ...]</div></div>
+    </div>
+
+    <div class="field-grid">
+      <div class="field"><label>Analyst / Lead Responder</label><div class="val" contenteditable="true">[Full Name, Team]</div></div>
+      <div class="field"><label>Escalated To</label><div class="val" contenteditable="true">[Manager / CISO / Legal / ...]</div></div>
+      <div class="field"><label>Detection Source</label><div class="val" contenteditable="true">[XDR Workbench / SIEM Alert / User Report / ...]</div></div>
+      <div class="field"><label>Workbench / Alert ID</label><div class="val" contenteditable="true">[WB-XXXXXXXX]</div></div>
+    </div>
+
+    <div class="field-grid cols-1">
+      <div class="field"><label>Executive Summary</label>
+        <textarea class="narrative" rows="4">[One-paragraph summary suitable for non-technical stakeholders. Include what happened, which systems were affected, the business impact, and the current status.]</textarea>
+      </div>
+    </div>
+  </div>
+  <!-- ── SECTION 2: Scope & Affected Assets ──────────────────── -->
+  <div class="section">
+    <div class="section-title">2. Scope &amp; Affected Assets</div>
+
+    <div class="field-grid">
+      <div class="field"><label>Estimated Scope</label><div class="val" contenteditable="true">[Number of endpoints / accounts / data records affected]</div></div>
+      <div class="field"><label>Business Units Impacted</label><div class="val" contenteditable="true">[Finance / HR / Operations / ...]</div></div>
+    </div>
+
+    <div class="section-subtitle">Affected Endpoints</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Hostname</th><th>IP Address</th><th>OS / Platform</th>
+          <th>Owner / BU</th><th>Role</th><th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td contenteditable="true">[hostname-01]</td>
+          <td contenteditable="true">[10.0.0.1]</td>
+          <td contenteditable="true">[Windows 11 22H2]</td>
+          <td contenteditable="true">[Finance / J. Smith]</td>
+          <td contenteditable="true">[Workstation]</td>
+          <td contenteditable="true">[Isolated]</td>
+        </tr>
+        <tr>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+        </tr>
+        <tr>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="section-subtitle">Affected User Accounts</div>
+    <table>
+      <thead>
+        <tr><th>Username / UPN</th><th>Account Type</th><th>Privilege Level</th><th>Status</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td contenteditable="true">[user@domain.com]</td>
+          <td contenteditable="true">[AD User]</td>
+          <td contenteditable="true">[Standard User]</td>
+          <td contenteditable="true">[Locked / Reset]</td>
+          <td contenteditable="true"></td>
+        </tr>
+        <tr>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── SECTION 3: Incident Description & Analysis ──────────── -->
+  <div class="section">
+    <div class="section-title">3. Incident Description &amp; Analysis</div>
+
+    <div class="section-subtitle">Timeline of Events</div>
+    <table>
+      <thead>
+        <tr><th>Timestamp (UTC)</th><th>Source / Tool</th><th>Event Description</th><th>Analyst Note</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td contenteditable="true">[YYYY-MM-DD HH:MM]</td>
+          <td contenteditable="true">[XDR / SIEM / EDR]</td>
+          <td contenteditable="true">[Suspicious process spawned from WINWORD.EXE]</td>
+          <td contenteditable="true">[Likely macro-based delivery]</td>
+        </tr>
+        <tr>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+        </tr>
+        <tr>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+        </tr>
+        <tr>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+        </tr>
+        <tr>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="section-subtitle">MITRE ATT&amp;CK Technique Mapping</div>
+    <table>
+      <thead>
+        <tr><th>Tactic</th><th>Technique ID</th><th>Technique Name</th><th>Sub-technique</th><th>Evidence / Observable</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td contenteditable="true">[Initial Access]</td>
+          <td contenteditable="true">[T1566]</td>
+          <td contenteditable="true">[Phishing]</td>
+          <td contenteditable="true">[T1566.001 – Spearphishing Attachment]</td>
+          <td contenteditable="true">[Malicious .docm received via email]</td>
+        </tr>
+        <tr>
+          <td contenteditable="true">[Execution]</td>
+          <td contenteditable="true">[T1059]</td>
+          <td contenteditable="true">[Command and Scripting Interpreter]</td>
+          <td contenteditable="true">[T1059.001 – PowerShell]</td>
+          <td contenteditable="true">[Encoded PowerShell command observed in EDR]</td>
+        </tr>
+        <tr>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+        </tr>
+        <tr>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+        </tr>
+        <tr>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr><td colspan="5">Reference: https://attack.mitre.org</td></tr>
+      </tfoot>
+    </table>
+
+    <div class="section-subtitle">Indicators of Compromise (IoCs)</div>
+    <table>
+      <thead>
+        <tr><th>IoC Type</th><th>Value</th><th>First Seen (UTC)</th><th>Source</th><th>Confidence</th><th>Action Taken</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td contenteditable="true">[MD5 Hash]</td>
+          <td contenteditable="true" style="font-family:monospace;font-size:8.5pt">[d41d8cd98f00b204e9800998ecf8427e]</td>
+          <td contenteditable="true">[YYYY-MM-DD HH:MM]</td>
+          <td contenteditable="true">[EDR Telemetry]</td>
+          <td contenteditable="true">[High]</td>
+          <td contenteditable="true">[Blocked / Quarantined]</td>
+        </tr>
+        <tr>
+          <td contenteditable="true">[SHA-256 Hash]</td>
+          <td contenteditable="true" style="font-family:monospace;font-size:8.5pt">[e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855]</td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+        </tr>
+        <tr>
+          <td contenteditable="true">[URL]</td>
+          <td contenteditable="true" style="font-family:monospace;font-size:8.5pt">[hxxps://malicious[.]example[.]com/payload]</td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true">[Firewall Block]</td>
+        </tr>
+        <tr>
+          <td contenteditable="true">[Domain]</td>
+          <td contenteditable="true" style="font-family:monospace;font-size:8.5pt">[malicious[.]example[.]com]</td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true">[DNS Sinkhole]</td>
+        </tr>
+        <tr>
+          <td contenteditable="true">[File Path]</td>
+          <td contenteditable="true" style="font-family:monospace;font-size:8.5pt">[C:\Users\Public\mal.exe]</td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true">[Deleted]</td>
+        </tr>
+        <tr><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td></tr>
+        <tr><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td></tr>
+      </tbody>
+    </table>
+
+    <div class="field-grid cols-1" style="margin-top:10px">
+      <div class="field"><label>Attack Narrative</label>
+        <textarea class="narrative" rows="6">[Describe the full attack chain: initial vector, lateral movement, persistence mechanisms, data exfiltration or payload delivery, and any C2 activity. Cite evidence from EDR/XDR telemetry, logs, and memory forensics.]</textarea>
+      </div>
+    </div>
+  </div>
+  <!-- ── SECTION 4: Response & Remediation ───────────────────── -->
+  <div class="section">
+    <div class="section-title">4. Response &amp; Remediation</div>
+
+    <div class="section-subtitle">Containment Actions</div>
+    <table class="checklist">
+      <thead>
+        <tr>
+          <th class="chk-col">&#10003;</th>
+          <th class="action-col">Containment Action</th>
+          <th class="owner-col">Owner</th>
+          <th class="ts-col">Completed (UTC)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="chk-col"><input type="checkbox"></td>
+          <td class="action-col" contenteditable="true">Isolate affected endpoint(s) from network</td>
+          <td class="owner-col" contenteditable="true">[Analyst Name]</td>
+          <td class="ts-col" contenteditable="true">[YYYY-MM-DD HH:MM]</td>
+        </tr>
+        <tr>
+          <td class="chk-col"><input type="checkbox"></td>
+          <td class="action-col" contenteditable="true">Disable compromised user account(s)</td>
+          <td class="owner-col" contenteditable="true"></td>
+          <td class="ts-col" contenteditable="true"></td>
+        </tr>
+        <tr>
+          <td class="chk-col"><input type="checkbox"></td>
+          <td class="action-col" contenteditable="true">Block IoCs (hashes, domains, IPs) at perimeter and EDR</td>
+          <td class="owner-col" contenteditable="true"></td>
+          <td class="ts-col" contenteditable="true"></td>
+        </tr>
+        <tr>
+          <td class="chk-col"><input type="checkbox"></td>
+          <td class="action-col" contenteditable="true">Preserve volatile memory and disk images for forensics</td>
+          <td class="owner-col" contenteditable="true"></td>
+          <td class="ts-col" contenteditable="true"></td>
+        </tr>
+        <tr>
+          <td class="chk-col"><input type="checkbox"></td>
+          <td class="action-col" contenteditable="true">[Add containment action]</td>
+          <td class="owner-col" contenteditable="true"></td>
+          <td class="ts-col" contenteditable="true"></td>
+        </tr>
+        <tr>
+          <td class="chk-col"><input type="checkbox"></td>
+          <td class="action-col" contenteditable="true">[Add containment action]</td>
+          <td class="owner-col" contenteditable="true"></td>
+          <td class="ts-col" contenteditable="true"></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="section-subtitle">Eradication Actions</div>
+    <table class="checklist">
+      <thead>
+        <tr>
+          <th class="chk-col">&#10003;</th>
+          <th class="action-col">Eradication Action</th>
+          <th class="owner-col">Owner</th>
+          <th class="ts-col">Completed (UTC)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="chk-col"><input type="checkbox"></td>
+          <td class="action-col" contenteditable="true">Remove malware / artefacts from all affected systems</td>
+          <td class="owner-col" contenteditable="true">[Analyst Name]</td>
+          <td class="ts-col" contenteditable="true"></td>
+        </tr>
+        <tr>
+          <td class="chk-col"><input type="checkbox"></td>
+          <td class="action-col" contenteditable="true">Delete / quarantine malicious files and registry keys</td>
+          <td class="owner-col" contenteditable="true"></td>
+          <td class="ts-col" contenteditable="true"></td>
+        </tr>
+        <tr>
+          <td class="chk-col"><input type="checkbox"></td>
+          <td class="action-col" contenteditable="true">Reset credentials for all affected accounts (force MFA re-enrolment)</td>
+          <td class="owner-col" contenteditable="true"></td>
+          <td class="ts-col" contenteditable="true"></td>
+        </tr>
+        <tr>
+          <td class="chk-col"><input type="checkbox"></td>
+          <td class="action-col" contenteditable="true">Patch / update vulnerable software or OS component</td>
+          <td class="owner-col" contenteditable="true"></td>
+          <td class="ts-col" contenteditable="true"></td>
+        </tr>
+        <tr>
+          <td class="chk-col"><input type="checkbox"></td>
+          <td class="action-col" contenteditable="true">[Add eradication action]</td>
+          <td class="owner-col" contenteditable="true"></td>
+          <td class="ts-col" contenteditable="true"></td>
+        </tr>
+        <tr>
+          <td class="chk-col"><input type="checkbox"></td>
+          <td class="action-col" contenteditable="true">[Add eradication action]</td>
+          <td class="owner-col" contenteditable="true"></td>
+          <td class="ts-col" contenteditable="true"></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="section-subtitle">Recovery Actions</div>
+    <table class="checklist">
+      <thead>
+        <tr>
+          <th class="chk-col">&#10003;</th>
+          <th class="action-col">Recovery Action</th>
+          <th class="owner-col">Owner</th>
+          <th class="ts-col">Completed (UTC)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="chk-col"><input type="checkbox"></td>
+          <td class="action-col" contenteditable="true">Restore system(s) from last known-good backup</td>
+          <td class="owner-col" contenteditable="true">[Sys Admin]</td>
+          <td class="ts-col" contenteditable="true"></td>
+        </tr>
+        <tr>
+          <td class="chk-col"><input type="checkbox"></td>
+          <td class="action-col" contenteditable="true">Re-image affected endpoints where required</td>
+          <td class="owner-col" contenteditable="true"></td>
+          <td class="ts-col" contenteditable="true"></td>
+        </tr>
+        <tr>
+          <td class="chk-col"><input type="checkbox"></td>
+          <td class="action-col" contenteditable="true">Verify system integrity before returning to production</td>
+          <td class="owner-col" contenteditable="true"></td>
+          <td class="ts-col" contenteditable="true"></td>
+        </tr>
+        <tr>
+          <td class="chk-col"><input type="checkbox"></td>
+          <td class="action-col" contenteditable="true">Monitor systems for 72 hours post-recovery before sign-off</td>
+          <td class="owner-col" contenteditable="true"></td>
+          <td class="ts-col" contenteditable="true"></td>
+        </tr>
+        <tr>
+          <td class="chk-col"><input type="checkbox"></td>
+          <td class="action-col" contenteditable="true">[Add recovery action]</td>
+          <td class="owner-col" contenteditable="true"></td>
+          <td class="ts-col" contenteditable="true"></td>
+        </tr>
+        <tr>
+          <td class="chk-col"><input type="checkbox"></td>
+          <td class="action-col" contenteditable="true">[Add recovery action]</td>
+          <td class="owner-col" contenteditable="true"></td>
+          <td class="ts-col" contenteditable="true"></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <!-- ── SECTION 5: Recommendations & Post-Incident ───────────── -->
+  <div class="section">
+    <div class="section-title">5. Recommendations &amp; Post-Incident</div>
+
+    <div class="section-subtitle">Root Cause Analysis</div>
+    <table>
+      <thead>
+        <tr><th>Category</th><th>Detail</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="font-weight:700;width:28%">Root Cause</td>
+          <td contenteditable="true">[Describe the fundamental cause, e.g. unpatched vulnerability CVE-XXXX-XXXX in Apache 2.4.49 exposed on a perimeter server]</td>
+        </tr>
+        <tr>
+          <td style="font-weight:700">Contributing Factors</td>
+          <td contenteditable="true">[e.g. No network segmentation between DMZ and internal network; EDR policy set to detect-only, not prevent]</td>
+        </tr>
+        <tr>
+          <td style="font-weight:700">Failed Controls</td>
+          <td contenteditable="true">[Control name / ID: what it was expected to do and why it failed, e.g. Patch Management — SLA exceeded by 45 days; Email Gateway — no sandbox detonation for macro-enabled Office docs]</td>
+        </tr>
+        <tr>
+          <td style="font-weight:700">Corrective Actions</td>
+          <td contenteditable="true">[Specific remediation steps tied to each failed control, with owner and target date]</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="section-subtitle">Recommendations</div>
+    <table>
+      <thead>
+        <tr><th>#</th><th>Recommendation</th><th>Priority</th><th>Owner</th><th>Target Date</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td contenteditable="true">1</td>
+          <td contenteditable="true">[Implement email sandbox / attachment detonation for macro-enabled files]</td>
+          <td contenteditable="true">[Critical]</td>
+          <td contenteditable="true">[Security Arch]</td>
+          <td contenteditable="true">[YYYY-MM-DD]</td>
+        </tr>
+        <tr>
+          <td contenteditable="true">2</td>
+          <td contenteditable="true">[Enforce EDR prevent mode policy across all endpoints]</td>
+          <td contenteditable="true">[High]</td>
+          <td contenteditable="true">[SOC Manager]</td>
+          <td contenteditable="true">[YYYY-MM-DD]</td>
+        </tr>
+        <tr>
+          <td contenteditable="true">3</td>
+          <td contenteditable="true">[Reduce patch SLA for critical CVEs to 7 days]</td>
+          <td contenteditable="true">[High]</td>
+          <td contenteditable="true">[IT Ops]</td>
+          <td contenteditable="true">[YYYY-MM-DD]</td>
+        </tr>
+        <tr>
+          <td contenteditable="true">4</td>
+          <td contenteditable="true">[Implement network segmentation between DMZ and corporate LAN]</td>
+          <td contenteditable="true">[Medium]</td>
+          <td contenteditable="true">[Network Team]</td>
+          <td contenteditable="true">[YYYY-MM-DD]</td>
+        </tr>
+        <tr>
+          <td contenteditable="true">5</td>
+          <td contenteditable="true">[Conduct tabletop exercise simulating ransomware scenario]</td>
+          <td contenteditable="true">[Medium]</td>
+          <td contenteditable="true">[CISO]</td>
+          <td contenteditable="true">[YYYY-MM-DD]</td>
+        </tr>
+        <tr>
+          <td contenteditable="true"></td>
+          <td contenteditable="true">[Add recommendation]</td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+          <td contenteditable="true"></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="field-grid cols-1" style="margin-top:10px">
+      <div class="field"><label>Lessons Learned</label>
+        <textarea class="narrative" rows="4">[What went well? What did not work? What will be done differently? Include detection gaps, playbook gaps, and communication breakdowns.]</textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SECTION 6: Incident Closure ─────────────────────────── -->
+  <div class="section">
+    <div class="section-title">6. Incident Closure</div>
+
+    <div class="field-grid">
+      <div class="field"><label>Closure Status</label><div class="val" contenteditable="true">[Closed / Monitoring / Pending Legal Hold]</div></div>
+      <div class="field"><label>Closure Date / Time (UTC)</label><div class="val" contenteditable="true">[YYYY-MM-DD HH:MM]</div></div>
+      <div class="field"><label>Total Duration (Detection to Closure)</label><div class="val" contenteditable="true">[X hours Y minutes]</div></div>
+      <div class="field"><label>MTTD (Mean Time to Detect)</label><div class="val" contenteditable="true">[X hours]</div></div>
+      <div class="field"><label>MTTR (Mean Time to Respond)</label><div class="val" contenteditable="true">[X hours]</div></div>
+      <div class="field"><label>Regulatory / Legal Notification Required?</label><div class="val" contenteditable="true">[Yes / No — if Yes, list bodies notified]</div></div>
+    </div>
+
+    <div class="field-grid cols-1">
+      <div class="field"><label>Evidence Artifacts &amp; Case Reference</label>
+        <textarea class="narrative" rows="3">[List all collected evidence: disk images, memory captures, log exports, email samples, PCAP files, ticket IDs in ITSM/SIEM. Include chain-of-custody reference where applicable.]</textarea>
+      </div>
+    </div>
+
+    <div class="field-grid cols-1">
+      <div class="field"><label>Additional Notes / Open Actions</label>
+        <textarea class="narrative" rows="3">[Any ongoing monitoring, pending legal hold items, or follow-up tasks that will be tracked outside this report.]</textarea>
+      </div>
+    </div>
+
+    <!-- Signature block -->
+    <div class="section-subtitle" style="margin-top:16px">Approvals</div>
+    <div class="sig-block">
+      <div class="sig-field">
+        <div class="sig-line">Lead Analyst: <span contenteditable="true">[Name]</span></div>
+      </div>
+      <div class="sig-field">
+        <div class="sig-line">SOC Manager: <span contenteditable="true">[Name]</span></div>
+      </div>
+      <div class="sig-field">
+        <div class="sig-line">CISO / Approver: <span contenteditable="true">[Name]</span></div>
+      </div>
+    </div>
+    <div class="sig-block" style="margin-top:10px">
+      <div class="sig-field">
+        <div class="sig-line">Date: <span contenteditable="true">[YYYY-MM-DD]</span></div>
+      </div>
+      <div class="sig-field">
+        <div class="sig-line">Date: <span contenteditable="true">[YYYY-MM-DD]</span></div>
+      </div>
+      <div class="sig-field">
+        <div class="sig-line">Date: <span contenteditable="true">[YYYY-MM-DD]</span></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /report-wrapper -->
+<script>
+// ── Mode switching ───────────────────────────────────────────────
+function setMode(mode) {
+  const body = document.body;
+  const btnEdit    = document.getElementById('btn-edit');
+  const btnPreview = document.getElementById('btn-preview');
+
+  if (mode === 'preview') {
+    body.classList.add('preview-mode');
+    btnPreview.classList.add('active');
+    btnEdit.classList.remove('active');
+    // Make all contenteditable non-editable visually but keep structure
+    document.querySelectorAll('[contenteditable="true"]').forEach(el => {
+      el.setAttribute('data-ce', 'true');
+      el.setAttribute('contenteditable', 'false');
+    });
+    document.querySelectorAll('textarea').forEach(el => el.setAttribute('readonly', true));
+    document.querySelectorAll('input[type=checkbox]').forEach(el => el.disabled = true);
+  } else {
+    body.classList.remove('preview-mode');
+    btnEdit.classList.add('active');
+    btnPreview.classList.remove('active');
+    document.querySelectorAll('[data-ce="true"]').forEach(el => {
+      el.setAttribute('contenteditable', 'true');
+    });
+    document.querySelectorAll('textarea').forEach(el => el.removeAttribute('readonly'));
+    document.querySelectorAll('input[type=checkbox]').forEach(el => el.disabled = false);
+  }
+}
+
+// Start in edit mode
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('btn-edit').classList.add('active');
+});
+</script>
+</body>
+</html>

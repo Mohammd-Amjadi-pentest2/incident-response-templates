@@ -1,0 +1,6 @@
+# Never commit filled reports — only the blank template — to prevent accidental
+# disclosure of real IOCs, hostnames, IPs, or hashes from production incidents.
+
+WB-*.html
+*-filled.html
+incidents/
